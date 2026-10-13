@@ -1,0 +1,133 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<!-- ===================================================================================
+		     TARGET FRAMEWORKS
+		     ====
+		     This project is deliberately restricted to Windows only. The Android / iOS /
+		     MacCatalyst target frameworks that ship with the MAUI template are COMMENTED OUT
+		     rather than deleted, so that they can be restored in one edit if the app ever needs
+		     to run on a phone or a Mac. Building for those platforms requires a JDK (Android)
+		     or Xcode on macOS (iOS / MacCatalyst), neither of which is needed for the desktop
+		     experience this sample browser targets.
+		     =================================================================================== -->
+		<TargetFrameworks>net10.0-windows10.0.19041.0</TargetFrameworks>
+		<!-- <TargetFrameworks>net10.0-android</TargetFrameworks> -->
+		<!-- <TargetFrameworks Condition="!$([MSBuild]::IsOSPlatform('linux'))">$(TargetFrameworks);net10.0-ios;net10.0-maccatalyst</TargetFrameworks> -->
+		<!-- <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks> -->
+
+		<!-- ===================================================================================
+		     MVVMTK0045 SUPPRESSION
+		     ====
+		     CommunityToolkit.Mvvm's [ObservableProperty] source generator emits MVVMTK0045 to
+		     advise migrating from the private-field form to the C# 13 "partial property" form,
+		     which is friendlier to Native AOT.
+		     That migration was attempted and does NOT work with CommunityToolkit.Mvvm 8.4.0 in
+		     this project: the generator fails to emit the implementing declaration (CS9248) and
+		     partial properties cannot carry initialisers (CS8050).
+		     This app is not published with Native AOT, so the private-field form is correct and
+		     safe here. The warning is suppressed to keep the build output clean.
+		     =================================================================================== -->
+
+		<!-- Note for MacCatalyst:
+		The default runtime is maccatalyst-x64, except in Release config, in which case the default is maccatalyst-x64;maccatalyst-arm64.
+		When specifying both architectures, use the plural <RuntimeIdentifiers> instead of the singular <RuntimeIdentifier>.
+		The Mac App Store will NOT accept apps with ONLY maccatalyst-arm64 indicated;
+		either BOTH runtimes must be indicated or ONLY macatalyst-x64. -->
+		<!-- For example: <RuntimeIdentifiers>maccatalyst-x64;maccatalyst-arm64</RuntimeIdentifiers> -->
+
+		<OutputType>Exe</OutputType>
+		<RootNamespace>Propulsion.App</RootNamespace>
+		<UseMaui>true</UseMaui>
+		<SingleProject>true</SingleProject>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<NoWarn>$(NoWarn);MVVMTK0045</NoWarn>
+
+		<!-- Enable XAML source generation for faster build times and improved performance.
+		     This generates C# code from XAML at compile time instead of runtime inflation.
+		     To disable, remove this line.
+		     For individual files, you can override by setting Inflator metadata:
+		       <MauiXaml Update="MyPage.xaml" Inflator="Default" /> (reverts to defaults: Runtime for Debug, XamlC for Release)
+		       <MauiXaml Update="MyPage.xaml" Inflator="Runtime" /> (force runtime inflation) -->
+		<MauiXamlInflator>SourceGen</MauiXamlInflator>
+
+		<!-- Display name -->
+		<ApplicationTitle>Rocket Propulsion Elements</ApplicationTitle>
+
+		<!-- App Identifier -->
+		<ApplicationId>com.straumann.propulsion.samples</ApplicationId>
+
+		<!-- Versions -->
+		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+		<ApplicationVersion>1</ApplicationVersion>
+
+		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
+		<WindowsPackageType>None</WindowsPackageType>
+
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
+		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- App Icon -->
+		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" />
+
+		<!-- Splash Screen -->
+		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
+
+		<!-- Images -->
+		<MauiImage Include="Resources\Images\*" />
+		<MauiImage Update="Resources\Images\dotnet_bot.png" Resize="True" BaseSize="300,185" />
+		
+		<!-- Custom Fonts -->
+		<MauiFont Include="Resources\Fonts\*" />
+
+		<!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
+		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!--
+		  ====================================================================
+		  DOCUMENTATION AND PYTHON TRANSLATIONS
+		  ====================================================================
+		  The written help, the per topic instruction guides and the Python
+		  version of every sample are real files on disk, checked in beside
+		  the source, rather than string literals in C#. That way they can be
+		  read, diffed, printed and (for the Python) actually executed without
+		  this application being involved at all.
+
+		  They are embedded into the assembly so the app still ships as one
+		  self contained executable. Each is given a FLAT logical name, which
+		  is what ContentLibrary looks up:
+
+		      docs\help.md                            ->  doc.help
+		      docs\guides\ch4-rocket-equation.md      ->  guide.ch4-rocket-equation
+		      python\examples\ch4-rocket-equation.py  ->  py.ch4-rocket-equation
+
+		  Note that the guide and Python file names are exactly the sample Id
+		  from SampleCatalog. That is the whole binding mechanism: no registry,
+		  no attribute, no extra property on CodeSample. Drop a correctly named
+		  file into either folder and it appears in the app.
+		  ====================================================================
+		-->
+		<EmbeddedResource Include="..\..\docs\help.md" LogicalName="doc.help" />
+		<EmbeddedResource Include="..\..\docs\guides\*.md" LogicalName="guide.%(Filename)" />
+		<EmbeddedResource Include="..\..\python\examples\*.py" LogicalName="py.%(Filename)" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\Propulsion.Core\Propulsion.Core.csproj" />
+	</ItemGroup>
+
+</Project>

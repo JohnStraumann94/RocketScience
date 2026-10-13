@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Propulsion.App/Propulsion.App.csproj" />
+    <Project Path="src/Propulsion.Core/Propulsion.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Propulsion.Core.Tests/Propulsion.Core.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+    DocumentPage.xaml
+    =================
+    A single reusable window for every piece of written documentation in the app. It is used
+    for BOTH the general Help document and the per-topic Instructions, because the two differ
+    only in their text: the chrome, the scrolling, the comfortable reading measure and the
+    copy button are identical.
+
+    Layout:
+
+        +==========================================+
+        |  EYEBROW                                 |   header
+        |  Document title                          |
+        +==========================================+
+        |                                          |
+        |   rendered Markdown, capped at a         |   body (scrolls)
+        |   comfortable reading width              |
+        |                                          |
+        +==========================================+
+        |  source file hint         [Copy as text] |   footer
+        +==========================================+
+
+    There is intentionally no ViewModel. The page is handed a finished document in its
+    constructor and renders it once; nothing on it ever changes afterwards, so an observable
+    layer would buy nothing.
+
+    The body is built in code behind by DocumentRenderer rather than declared in XAML,
+    because the shape of the content is not known until the Markdown has been parsed.
+
+    Colours are literal hex values rather than StaticResource lookups because the app's
+    palette is declared in MainPage.xaml's page level ResourceDictionary, which is not in
+    scope here. TrajectoryPage.xaml does the same thing for the same reason.
+
+    NOTE for future editors: XAML comments must never contain a double hyphen, because XML
+    forbids it inside a comment. That is why the boxes above are drawn with '=' characters.
+-->
+<ContentPage
+    x:Class="Propulsion.App.Views.DocumentPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Title="Documentation"
+    BackgroundColor="#0C1017">
+
+    <ContentPage.Resources>
+        <Style x:Key="FooterButton" TargetType="Button">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Padding" Value="16,8" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="BackgroundColor" Value="#2E3440" />
+            <Setter Property="TextColor" Value="#E7ECF4" />
+        </Style>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <!-- ===== HEADER =====
+             The eyebrow / title pair matches the main window's detail pane, so the
+             documentation reads as part of the same application rather than as a
+             bolted on viewer. -->
+        <Border
+            Grid.Row="0"
+            BackgroundColor="#161A22"
+            Stroke="Transparent"
+            StrokeThickness="0"
+            Padding="24,16">
+            <VerticalStackLayout Spacing="2">
+                <Label
+                    x:Name="EyebrowLabel"
+                    FontSize="12"
+                    FontAttributes="Bold"
+                    CharacterSpacing="1.4"
+                    TextColor="#4EA8FF" />
+                <Label
+                    x:Name="TitleLabel"
+                    FontSize="21"
+                    FontAttributes="Bold"
+                    TextColor="#E7ECF4" />
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- ===== BODY =====
+             MaximumWidthRequest caps the measure at a comfortable reading width. Full
+             width prose on a wide monitor is genuinely hard to read: the eye loses its
+             place on the return sweep. The content is left aligned rather than centred
+             so it stays anchored to the header above it. -->
+        <ScrollView Grid.Row="1" Padding="24,18,24,24">
+            <VerticalStackLayout
+                x:Name="BodyHost"
+                MaximumWidthRequest="920"
+                HorizontalOptions="Start" />
+        </ScrollView>
+
+        <!-- ===== FOOTER =====
+             Carries the source file hint, so a reader who wants to correct or extend the
+             documentation knows exactly which file on disk to open. These documents are
+             plain Markdown checked in next to the source, not strings buried in a
+             compiled assembly. -->
+        <Border
+            Grid.Row="2"
+            BackgroundColor="#161A22"
+            Stroke="Transparent"
+            StrokeThickness="0"
+            Padding="24,10">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                <Label
+                    x:Name="SourceLabel"
+                    Grid.Column="0"
+                    FontSize="11.5"
+                    VerticalOptions="Center"
+                    TextColor="#9AA4B5" />
+                <Button
+                    Grid.Column="1"
+                    Text="Copy as text"
+                    Clicked="OnCopyClicked"
+                    Style="{StaticResource FooterButton}" />
+            </Grid>
+        </Border>
+    </Grid>
+</ContentPage>

@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+    TrajectoryPage.xaml
+    ===================
+    The "Visualize Trajectory" window: an animated, playable illustration of a computed
+    flight path.
+
+    Layout:
+
+        +==========================================+
+        |  Title / subtitle                        |   header
+        +==========================================+
+        |                                          |
+        |        GraphicsView  (the animation)      |   the picture
+        |                                          |
+        +==========================================+
+        |  [Play] [Restart]  speed  [====scrub====] |   transport controls
+        +==========================================+
+        |  modelling notes                         |   footer
+        +==========================================+
+
+    All the animation logic lives in the code-behind rather than a view-model, because it is
+    entirely about driving a frame timer and invalidating a control - there is no application
+    state here worth abstracting, and the indirection would only obscure it.
+
+    NOTE for future editors: XAML comments must never contain a double hyphen, because XML
+    forbids it inside a comment. That is why the boxes above are drawn with '=' characters.
+-->
+<ContentPage
+    x:Class="Astro.App.Views.TrajectoryPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Title="Trajectory Visualisation"
+    BackgroundColor="#0C1017">
+
+    <Grid RowDefinitions="Auto,*,Auto,Auto" Padding="16" RowSpacing="10">
+
+        <!-- ===== HEADER ===== -->
+        <VerticalStackLayout Grid.Row="0" Spacing="2">
+            <Label
+                x:Name="TitleLabel"
+                FontSize="19"
+                FontAttributes="Bold"
+                TextColor="#E6EDF3" />
+            <Label
+                x:Name="SubtitleLabel"
+                FontSize="12.5"
+                TextColor="#8A98A8" />
+        </VerticalStackLayout>
+
+        <!-- ===== THE ANIMATION SURFACE =====
+             GraphicsView hands its ICanvas to TrajectoryDrawable once per frame. Calling
+             Invalidate() on it is what produces the next frame; there is no other redraw
+             mechanism and no retained scene graph. -->
+        <Border
+            Grid.Row="1"
+            Stroke="#2A3441"
+            StrokeThickness="1"
+            BackgroundColor="#0C1017">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="8" />
+            </Border.StrokeShape>
+            <GraphicsView x:Name="Surface" />
+        </Border>
+
+        <!-- ===== TRANSPORT CONTROLS ===== -->
+        <Grid
+            Grid.Row="2"
+            ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto"
+            ColumnSpacing="10"
+            VerticalOptions="Center">
+
+            <Button
+                x:Name="PlayPauseButton"
+                Grid.Column="0"
+                Text="Pause"
+                WidthRequest="96"
+                HeightRequest="38"
+                CornerRadius="6"
+                FontSize="13"
+                BackgroundColor="#7BD88F"
+                TextColor="#0C1017"
+                Clicked="OnPlayPauseClicked" />
+
+            <Button
+                Grid.Column="1"
+                Text="Restart"
+                WidthRequest="96"
+                HeightRequest="38"
+                CornerRadius="6"
+                FontSize="13"
+                BackgroundColor="#2E3440"
+                TextColor="#E6EDF3"
+                Clicked="OnRestartClicked" />
+
+            <Button
+                x:Name="PathToggleButton"
+                Grid.Column="2"
+                Text="Hide path ahead"
+                WidthRequest="150"
+                HeightRequest="38"
+                CornerRadius="6"
+                FontSize="13"
+                BackgroundColor="#2E3440"
+                TextColor="#E6EDF3"
+                Clicked="OnTogglePathClicked" />
+
+            <Label
+                Grid.Column="3"
+                Text="Speed"
+                FontSize="12"
+                TextColor="#8A98A8"
+                VerticalOptions="Center" />
+
+            <Picker
+                x:Name="SpeedPicker"
+                Grid.Column="4"
+                WidthRequest="92"
+                FontSize="12"
+                TextColor="#E6EDF3"
+                TitleColor="#8A98A8"
+                BackgroundColor="#1B222C"
+                SelectedIndexChanged="OnSpeedChanged" />
+
+            <!-- The scrub bar. Dragging it pauses playback, exactly like a video player. -->
+            <Slider
+                x:Name="ScrubSlider"
+                Grid.Column="5"
+                Minimum="0"
+                Maximum="1"
+                MinimumTrackColor="#FF8A3D"
+                MaximumTrackColor="#2A3441"
+                ThumbColor="#E6EDF3"
+                VerticalOptions="Center"
+                DragStarted="OnScrubDragStarted"
+                ValueChanged="OnScrubValueChanged" />
+
+            <Label
+                x:Name="ClockLabel"
+                Grid.Column="6"
+                FontFamily="Consolas"
+                FontSize="13"
+                WidthRequest="130"
+                HorizontalTextAlignment="End"
+                TextColor="#E6EDF3"
+                VerticalOptions="Center" />
+        </Grid>
+
+        <!-- ===== FOOTER: modelling assumptions =====
+             Stated on the same screen as the picture, because a plausible looking animation
+             is exactly the kind of thing that gets over-interpreted. -->
+        <Label
+            x:Name="NotesLabel"
+            Grid.Row="3"
+            FontSize="11.5"
+            LineHeight="1.35"
+            TextColor="#7C8895" />
+    </Grid>
+</ContentPage>

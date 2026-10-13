@@ -1,0 +1,517 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+    MainPage.xaml
+    =============
+    The single page of the application. It implements the layout the brief asked for:
+
+        +====+====+
+        |  TABLE OF CONTENTS   |  DETAIL PANE                                   |
+        |  (grouped by the     |    * what the sample demonstrates (theory)     |
+        |   book's chapters)   |    * editable inputs                           |
+        |                      |    * the C# source that will run               |
+        |                      |    * the live output of actually running it    |
+        +====+====+
+
+    Everything on the right is driven purely by data binding against MainViewModel, so
+    adding a new sample never requires touching this file - only SampleCatalog.cs.
+-->
+<ContentPage
+    x:Class="Astro.App.Views.MainPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:converters="clr-namespace:Astro.App.Converters"
+    xmlns:models="clr-namespace:Astro.App.Models"
+    xmlns:viewmodels="clr-namespace:Astro.App.ViewModels"
+    x:DataType="viewmodels:MainViewModel"
+    Title="Fundamentals of Astrodynamics"
+    BackgroundColor="#1B1F27">
+
+    <!--
+        Page-level resources.
+
+        x:DataType above enables compiled bindings: the XAML compiler resolves every binding
+        path against MainViewModel at build time, which turns typos into build errors instead
+        of silent runtime no-ops, and removes the reflection cost at run time. Note that every
+        DataTemplate below therefore needs its own x:DataType, because inside a template the
+        binding context is the item, not the page's view-model.
+    -->
+    <ContentPage.Resources>
+        <ResourceDictionary>
+
+            <converters:ErrorToColorConverter x:Key="ErrorToColor" />
+            <converters:InvertBoolConverter x:Key="InvertBool" />
+            <converters:BoolToToggleColorConverter x:Key="ToggleColor" />
+
+            <!-- Shared palette. Kept here rather than inline so the whole page restyles from one place. -->
+            <Color x:Key="PanelBackground">#232834</Color>
+            <Color x:Key="PanelBorder">#3A3F4B</Color>
+            <Color x:Key="CodeBackground">#12151C</Color>
+            <Color x:Key="Accent">#4EA8FF</Color>
+            <Color x:Key="PrimaryText">#E7ECF4</Color>
+            <Color x:Key="SecondaryText">#9AA4B5</Color>
+
+            <!-- Section heading above each block in the detail pane. -->
+            <Style x:Key="SectionHeader" TargetType="Label">
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="FontAttributes" Value="Bold" />
+                <Setter Property="TextColor" Value="{StaticResource Accent}" />
+                <Setter Property="CharacterSpacing" Value="1.6" />
+                <Setter Property="Margin" Value="0,18,0,6" />
+            </Style>
+
+            <!-- Card that wraps each block in the detail pane. -->
+            <Style x:Key="Card" TargetType="Border">
+                <Setter Property="Stroke" Value="{StaticResource PanelBorder}" />
+                <Setter Property="StrokeThickness" Value="1" />
+                <Setter Property="BackgroundColor" Value="{StaticResource PanelBackground}" />
+                <Setter Property="Padding" Value="14" />
+                <Setter Property="StrokeShape" Value="RoundRectangle 6" />
+            </Style>
+
+            <!-- Buttons across the bottom of the input block. -->
+            <Style x:Key="ActionButton" TargetType="Button">
+                <Setter Property="FontSize" Value="14" />
+                <Setter Property="Padding" Value="18,8" />
+                <Setter Property="CornerRadius" Value="4" />
+            </Style>
+
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <!--
+        Root layout: a header strip, the two-pane body, and a status footer.
+        Row heights: Auto / * / Auto so the body soaks up all remaining space.
+    -->
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <!-- ==================================================================
+             HEADER
+             ================================================================== -->
+        <Border
+            Grid.Row="0"
+            BackgroundColor="#161A22"
+            Stroke="Transparent"
+            StrokeThickness="0"
+            Padding="20,14">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                <VerticalStackLayout Grid.Column="0" Spacing="2">
+                    <Label
+                        Text="Fundamentals of Astrodynamics"
+                        FontSize="21"
+                        FontAttributes="Bold"
+                        TextColor="{StaticResource PrimaryText}" />
+                    <Label
+                        Text="Bate, Mueller &amp; White - every chapter's mathematics implemented in C# and runnable here."
+                        FontSize="13"
+                        TextColor="{StaticResource SecondaryText}" />
+                </VerticalStackLayout>
+
+                <!-- Application level help and support, grouped at the right of the header.
+                     Help is deliberately here rather than beside the Run button, because it
+                     describes the whole program: putting it next to the per sample controls
+                     would suggest it was about the selected sample, which is what the
+                     Instructions button is for. Donate sits beside it for the same reason -
+                     it concerns the project, not any one sample. -->
+                <HorizontalStackLayout
+                    Grid.Column="1"
+                    Spacing="8"
+                    VerticalOptions="Center">
+                    <!-- Opens the donation page in the default browser. The application itself
+                         never handles a payment; see Services/DonationOptions.cs. -->
+                    <Button
+                        Text="Donate"
+                        Command="{Binding DonateCommand}"
+                        Style="{StaticResource ActionButton}"
+                        BackgroundColor="#7A3B52"
+                        TextColor="{StaticResource PrimaryText}"
+                        ToolTipProperties.Text="Support this project - opens a donation page in your browser" />
+                    <Button
+                        Text="Help"
+                        Command="{Binding ShowHelpCommand}"
+                        Style="{StaticResource ActionButton}"
+                        BackgroundColor="#2E3440"
+                        TextColor="{StaticResource PrimaryText}" />
+                </HorizontalStackLayout>
+            </Grid>
+        </Border>
+
+        <!-- ==================================================================
+             BODY: table of contents (fixed width) + detail pane (fills)
+             ================================================================== -->
+        <Grid Grid.Row="1" ColumnDefinitions="360,*">
+
+            <!-- ====
+                 LEFT: TABLE OF CONTENTS
+                 A grouped CollectionView. ItemsSource is the collection of
+                 ChapterGroup objects; because ChapterGroup derives from
+                 List<CodeSample>, IsGrouped="True" makes the CollectionView
+                 treat each group as its own header + list of items.
+                 ==== -->
+            <Border
+                Grid.Column="0"
+                BackgroundColor="#1E222C"
+                Stroke="Transparent"
+                StrokeThickness="0"
+                Padding="0">
+
+                <Grid RowDefinitions="Auto,*">
+
+                    <Label
+                        Grid.Row="0"
+                        Text="TABLE OF CONTENTS"
+                        Style="{StaticResource SectionHeader}"
+                        Margin="16,14,16,8" />
+
+                    <CollectionView
+                        Grid.Row="1"
+                        ItemsSource="{Binding Chapters}"
+                        IsGrouped="True"
+                        SelectionMode="Single"
+                        SelectedItem="{Binding SelectedSample, Mode=TwoWay}">
+
+                        <!-- Chapter banner. Binding context here is the ChapterGroup. -->
+                        <CollectionView.GroupHeaderTemplate>
+                            <DataTemplate x:DataType="models:ChapterGroup">
+                                <Border
+                                    BackgroundColor="#171B23"
+                                    Stroke="Transparent"
+                                    Padding="16,10,16,8">
+                                    <HorizontalStackLayout Spacing="8">
+                                        <Label
+                                            Text="{Binding ChapterNumber}"
+                                            FontSize="11"
+                                            FontAttributes="Bold"
+                                            TextColor="{StaticResource Accent}"
+                                            VerticalOptions="Center" />
+                                        <Label
+                                            Text="{Binding Title}"
+                                            FontSize="12"
+                                            FontAttributes="Bold"
+                                            TextColor="{StaticResource SecondaryText}"
+                                            VerticalOptions="Center" />
+                                    </HorizontalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.GroupHeaderTemplate>
+
+                        <!-- One row per sample. Binding context is the CodeSample. -->
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="models:CodeSample">
+                                <Grid Padding="20,9,14,9" RowDefinitions="Auto,Auto">
+                                    <!--
+                                        The title row is a two column Grid so that samples which
+                                        can be animated advertise the fact in the table of
+                                        contents itself. Before this badge existed the only cue
+                                        was the orange "Visualize Trajectory" button, which does
+                                        not appear until the sample has already been selected -
+                                        so the feature was effectively undiscoverable unless you
+                                        clicked every entry in turn.
+
+                                        The badge binds to CanVisualize, exactly like the button
+                                        does, so the two can never disagree and nothing here has
+                                        to know which samples qualify.
+                                    -->
+                                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                        <Label
+                                            Grid.Column="0"
+                                            Text="{Binding Title}"
+                                            FontSize="14"
+                                            VerticalOptions="Center"
+                                            TextColor="{StaticResource PrimaryText}" />
+                                        <Border
+                                            Grid.Column="1"
+                                            IsVisible="{Binding CanVisualize}"
+                                            BackgroundColor="#FF8A3D"
+                                            Stroke="Transparent"
+                                            StrokeThickness="0"
+                                            Padding="6,1"
+                                            VerticalOptions="Center">
+                                            <Border.StrokeShape>
+                                                <RoundRectangle CornerRadius="3" />
+                                            </Border.StrokeShape>
+                                            <Label
+                                                Text="ANIMATED"
+                                                FontSize="9"
+                                                FontAttributes="Bold"
+                                                TextColor="#0C1017" />
+                                        </Border>
+                                    </Grid>
+                                    <Label
+                                        Grid.Row="1"
+                                        Text="{Binding Summary}"
+                                        FontSize="11"
+                                        LineBreakMode="TailTruncation"
+                                        MaxLines="2"
+                                        TextColor="{StaticResource SecondaryText}" />
+                                </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+
+                    </CollectionView>
+                </Grid>
+            </Border>
+
+            <!-- ====
+                 RIGHT: DETAIL PANE
+                 Wrapped in a ScrollView because theory + code + output easily
+                 exceed one screen. IsVisible is bound to HasSelection so the
+                 pane is replaced by a prompt until the user picks something.
+                 ==== -->
+            <Grid Grid.Column="1">
+
+                <!-- Empty state, shown only before the first selection. -->
+                <Label
+                    Text="Choose a code sample from the table of contents."
+                    FontSize="15"
+                    TextColor="{StaticResource SecondaryText}"
+                    HorizontalOptions="Center"
+                    VerticalOptions="Center"
+                    IsVisible="{Binding HasSelection, Converter={StaticResource InvertBool}}" />
+
+                <ScrollView IsVisible="{Binding HasSelection}">
+                    <VerticalStackLayout Padding="24,18,24,28" Spacing="0">
+
+                        <!-- Sample identity -->
+                        <Label
+                            Text="{Binding SelectedChapter}"
+                            FontSize="12"
+                            FontAttributes="Bold"
+                            CharacterSpacing="1.4"
+                            TextColor="{StaticResource Accent}" />
+                        <Label
+                            Text="{Binding SelectedTitle}"
+                            FontSize="24"
+                            FontAttributes="Bold"
+                            TextColor="{StaticResource PrimaryText}" />
+
+                        <!-- ===== THEORY ===== -->
+                        <Label Text="WHAT THIS DEMONSTRATES" Style="{StaticResource SectionHeader}" />
+                        <Border Style="{StaticResource Card}">
+                            <Label
+                                Text="{Binding SelectedTheory}"
+                                FontSize="14"
+                                LineHeight="1.45"
+                                TextColor="{StaticResource PrimaryText}" />
+                        </Border>
+
+                        <!-- ===== INPUTS =====
+                             BindableLayout renders one editor per SampleParameter. A
+                             CollectionView is deliberately NOT used here: nesting a scrolling,
+                             virtualising control inside a ScrollView produces measurement
+                             problems, and these lists are only a handful of items long. -->
+                        <Label Text="INPUTS" Style="{StaticResource SectionHeader}" />
+                        <Border Style="{StaticResource Card}">
+                            <VerticalStackLayout Spacing="10">
+
+                                <VerticalStackLayout
+                                    Spacing="10"
+                                    BindableLayout.ItemsSource="{Binding SelectedParameters}">
+                                    <BindableLayout.ItemTemplate>
+                                        <DataTemplate x:DataType="models:SampleParameter">
+                                            <Grid ColumnDefinitions="230,160,*" ColumnSpacing="12">
+
+                                                <!-- Label -->
+                                                <Label
+                                                    Grid.Column="0"
+                                                    Text="{Binding Label}"
+                                                    FontSize="13"
+                                                    VerticalOptions="Center"
+                                                    TextColor="{StaticResource PrimaryText}" />
+
+                                                <!-- Editor. Bound to the string form of the value so that
+                                                     partially typed entries such as "-" or "1." do not get
+                                                     clobbered by a failed double.Parse on every keystroke. -->
+                                                <Entry
+                                                    Grid.Column="1"
+                                                    Text="{Binding Value, Mode=TwoWay}"
+                                                    Keyboard="Numeric"
+                                                    FontFamily="Consolas"
+                                                    FontSize="13"
+                                                    BackgroundColor="{StaticResource CodeBackground}"
+                                                    TextColor="{StaticResource PrimaryText}" />
+
+                                                <!-- Units + help text -->
+                                                <VerticalStackLayout Grid.Column="2" VerticalOptions="Center">
+                                                    <Label
+                                                        Text="{Binding Units}"
+                                                        IsVisible="{Binding HasUnits}"
+                                                        FontSize="12"
+                                                        FontAttributes="Bold"
+                                                        TextColor="{StaticResource SecondaryText}" />
+                                                    <Label
+                                                        Text="{Binding Help}"
+                                                        IsVisible="{Binding HasHelp}"
+                                                        FontSize="11"
+                                                        TextColor="{StaticResource SecondaryText}" />
+                                                </VerticalStackLayout>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </BindableLayout.ItemTemplate>
+                                </VerticalStackLayout>
+
+                                <!-- Commands. RunCommand / ResetParametersCommand / CopyOutputCommand
+                                     are generated by CommunityToolkit.Mvvm's [RelayCommand]. -->
+                                <HorizontalStackLayout Spacing="10" Margin="0,6,0,0">
+                                    <Button
+                                        Text="Run"
+                                        Command="{Binding RunCommand}"
+                                        Style="{StaticResource ActionButton}"
+                                        BackgroundColor="{StaticResource Accent}"
+                                        TextColor="#0C1017" />
+                                    <Button
+                                        Text="Reset inputs"
+                                        Command="{Binding ResetParametersCommand}"
+                                        Style="{StaticResource ActionButton}"
+                                        BackgroundColor="#2E3440"
+                                        TextColor="{StaticResource PrimaryText}" />
+                                    <!-- Visible only for samples whose subject is an actual
+                                         path through space. The binding is to CanVisualize,
+                                         which follows the selected sample, so no code here
+                                         knows which samples qualify. -->
+                                    <Button
+                                        Text="Visualize Trajectory"
+                                        Command="{Binding VisualizeTrajectoryCommand}"
+                                        IsVisible="{Binding CanVisualize}"
+                                        Style="{StaticResource ActionButton}"
+                                        BackgroundColor="#FF8A3D"
+                                        TextColor="#0C1017" />
+                                    <Button
+                                        Text="Copy output"
+                                        Command="{Binding CopyOutputCommand}"
+                                        Style="{StaticResource ActionButton}"
+                                        BackgroundColor="#2E3440"
+                                        TextColor="{StaticResource PrimaryText}" />
+                                    <!-- Per topic instructions. Always available: the
+                                         document is assembled from the sample's own
+                                         definition plus hand written notes, so there is
+                                         never a sample without one. -->
+                                    <Button
+                                        Text="Instructions"
+                                        Command="{Binding ShowInstructionsCommand}"
+                                        Style="{StaticResource ActionButton}"
+                                        BackgroundColor="#2E3440"
+                                        TextColor="{StaticResource PrimaryText}" />
+                                </HorizontalStackLayout>
+                            </VerticalStackLayout>
+                        </Border>
+
+                        <!-- ===== OUTPUT =====
+                             Placed above the source listing because it is what the user wants to
+                             see immediately after pressing Run. -->
+                        <Label Text="OUTPUT" Style="{StaticResource SectionHeader}" />
+                        <Border
+                            Style="{StaticResource Card}"
+                            BackgroundColor="{StaticResource CodeBackground}"
+                            Stroke="{Binding HasError, Converter={StaticResource ErrorToColor}}">
+                            <VerticalStackLayout Spacing="8">
+                                <Label
+                                    Text="{Binding Output}"
+                                    FontFamily="Consolas"
+                                    FontSize="13"
+                                    LineHeight="1.35"
+                                    TextColor="{Binding HasError, Converter={StaticResource ErrorToColor}, ConverterParameter=Text}" />
+                                <Label
+                                    Text="{Binding ExecutionSummary}"
+                                    FontSize="11"
+                                    FontAttributes="Italic"
+                                    TextColor="{StaticResource SecondaryText}" />
+                            </VerticalStackLayout>
+                        </Border>
+
+                        <!-- ===== SOURCE =====
+                             The heading row carries the language toggle. Both listings show
+                             the SAME calculation: the C# is the code this app actually
+                             executes when you press Run, and the Python is an independent,
+                             standalone translation that produces the same numbers outside
+                             the app entirely. -->
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <Label
+                                Grid.Column="0"
+                                Text="THE CODE THAT RUNS"
+                                Style="{StaticResource SectionHeader}"
+                                VerticalOptions="End" />
+
+                            <!-- A segmented control built from two buttons. Each binds its
+                                 colours to the boolean for its own language, so exactly one
+                                 of them is ever highlighted and no code behind is involved.
+                                 Hidden entirely when a sample has no Python version. -->
+                            <HorizontalStackLayout
+                                Grid.Column="1"
+                                Spacing="6"
+                                VerticalOptions="End"
+                                IsVisible="{Binding HasPython}">
+                                <Button
+                                    Text="C#"
+                                    Command="{Binding ShowCSharpCommand}"
+                                    Style="{StaticResource ActionButton}"
+                                    Padding="18,6"
+                                    FontSize="13"
+                                    BackgroundColor="{Binding ShowingCSharp, Converter={StaticResource ToggleColor}}"
+                                    TextColor="{Binding ShowingCSharp, Converter={StaticResource ToggleColor}, ConverterParameter=Text}" />
+                                <Button
+                                    Text="Python"
+                                    Command="{Binding ShowPythonCommand}"
+                                    Style="{StaticResource ActionButton}"
+                                    Padding="18,6"
+                                    FontSize="13"
+                                    BackgroundColor="{Binding ShowingPython, Converter={StaticResource ToggleColor}}"
+                                    TextColor="{Binding ShowingPython, Converter={StaticResource ToggleColor}, ConverterParameter=Text}" />
+                            </HorizontalStackLayout>
+                        </Grid>
+
+                        <Border
+                            Style="{StaticResource Card}"
+                            BackgroundColor="{StaticResource CodeBackground}">
+                            <VerticalStackLayout Spacing="10">
+                                <Label
+                                    Text="{Binding SelectedCode}"
+                                    FontFamily="Consolas"
+                                    FontSize="13"
+                                    LineHeight="1.35"
+                                    TextColor="#C8D3E4" />
+                                <Label
+                                    Text="{Binding CodeLanguageCaption}"
+                                    FontSize="11"
+                                    FontAttributes="Italic"
+                                    TextColor="{StaticResource SecondaryText}" />
+                            </VerticalStackLayout>
+                        </Border>
+
+                    </VerticalStackLayout>
+                </ScrollView>
+            </Grid>
+        </Grid>
+
+        <!-- ==================================================================
+             FOOTER: sample count, build stamp, and the local execution notice
+             ================================================================== -->
+        <Border
+            Grid.Row="2"
+            BackgroundColor="#161A22"
+            Stroke="Transparent"
+            StrokeThickness="0"
+            Padding="20,8">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="16">
+                <Label
+                    Grid.Column="0"
+                    Text="{Binding SampleCountCaption}"
+                    FontSize="12"
+                    TextColor="{StaticResource SecondaryText}" />
+                <Label
+                    Grid.Column="1"
+                    Text="{Binding RuntimeStatus}"
+                    FontSize="12"
+                    HorizontalTextAlignment="End"
+                    TextColor="{StaticResource SecondaryText}" />
+                <!-- The build stamp is here so that a tester reporting a problem can read the
+                     exact version off the screen instead of being asked which copy they have. -->
+                <Label
+                    Grid.Column="2"
+                    Text="{Binding BuildStamp}"
+                    FontSize="12"
+                    FontFamily="Consolas"
+                    TextColor="#5C6675" />
+            </Grid>
+        </Border>
+    </Grid>
+</ContentPage>
